@@ -7,7 +7,7 @@ Use similar to Waterfall()
 
    fil = frequency_cut()
 
-TODO: Time series does not produce a graph when cutting a whole column of frequencies. Fix this.
+TODO: Remove frequency to index function and replace with the attribute of waterfall object that Umran showed which I can't remeber the name of.
 
 """
 

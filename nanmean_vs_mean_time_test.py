@@ -1,72 +1,124 @@
 """
-#frequency_cut.py
+#nanmean_vs_mean_time.py
 
-function to remove undesired frequnecies from filterbank data.
-
-Use similar to Waterfall()
-
-   fil = frequency_cut()
-
-TODO: Time series does not produce a graph when cutting a whole column of frequencies. Fix this.
+Test for difference in computation time, if any, between numpy.mean() and numpy.nanmean() in the plot_time_series() function from filterbank module
 
 """
 
 import blimpy as bp
 import pylab as plt
 import numpy as np
+from blimpy.utils import db, lin, rebin, closest, unpack_2to8
+import time
 
-def frequency_to_index(frequency, f_increment, f0):
-    return int(np.round((frequency - f0) / f_increment))
 
-def frequency_cut(filename, f_start=None, f_stop=None, *ft_cut):
-    """ Cut data from specified frequency and time ranges.
+def plot_time_series_nanmean(filename, f_start=None, f_stop=None, if_id=0, logged=True, orientation='h', MJD_time=False, **kwargs):
+    """ Plot the time series.
 
-    Args:
-        filename (string): name of file to be cut
-        f_start (float): start frequency in MHz
-        f_stop (float): stop frequency in MHz
-        ft_cut (array of floats): an nx4 array containing frequnecy and time interval to be cut ie. [[f0, f1, t0, t1], ..., [f2, f3, t2, t3]]
-
-    Returns:
-        (fil): instance of Waterfall with cut data
+     Args:
+        filename (string): name of file to run test on
+        f_start (float): start frequency, in MHz
+        f_stop (float): stop frequency, in MHz
+        logged (bool): Plot in linear (False) or dB units (True),
+        kwargs: keyword args to be passed to matplotlib imshow()
     """
-
+    start = time.time()
     fil = bp.Waterfall(filename, f_start=f_start, f_stop=f_stop)
 
-    #Cut requested frequency and time ranges
-    if ft_cut:
-        if f_stop == None:
-            f_stop = fil.file_header[b'fch1']
+    ax = plt.gca()
+    plot_f, plot_data = fil.grab_data(f_start, f_stop, if_id)
 
-        for ft_interval in ft_cut:
+    if logged and fil.header[b'nbits'] >= 8:
+        plot_data = db(plot_data)
 
-            #Flip frequency array intervals if frequency increment is negative
-            if fil.file_header[b'foff'] < 0:
-                a = ft_interval[0]
-                ft_interval[0] = ft_interval[1]
-                ft_interval[1] = a
+    #Since the data has been squeezed, the axis for time goes away if only one bin, causing a bug with axis=1
+    if len(plot_data.shape) > 1:
+        plot_data = np.nanmean(plot_data, axis=1)
+    else:
+        plot_data = np.nanmean(plot_data)
 
-            #If interval limit is not specified set it to upper/lower of data, if frequency limit is specified convert to index
-            if ft_interval[0] == None:
-                ft_interval[0] = 0
-            else:
-                ft_interval[0] = frequency_to_index(ft_interval[0], fil.file_header[b'foff'], f_stop)
-            if ft_interval[1] == None:
-                ft_interval[1] = len(fil.data[0, 0])
-            else:
-                ft_interval[1] = frequency_to_index(ft_interval[1], fil.file_header[b'foff'], f_stop)
-            if ft_interval[2] == None:
-                ft_interval[2] = 0
-            if ft_interval[3] == None:
-                ft_interval[3] = len(fil.data)
+    #Make proper time axis for plotting (but only for plotting!). Note that this makes the values inclusive.
+    extent = fil._calc_extent(plot_f=plot_f,plot_t=fil.timestamps,MJD_time=MJD_time)
+    plot_t = np.linspace(extent[2],extent[3],len(fil.timestamps))
 
-            for i in range(ft_interval[2], ft_interval[3]):
-                for j in range(ft_interval[0], ft_interval[1]):
-                    fil.data[i, 0, j] = 'nan'
+    if MJD_time:
+        tlabel = "Time [MJD]"
+    else:
+        tlabel = "Time [s]"
 
-    return fil
+    if logged:
+        plabel = "Power [dB]"
+    else:
+        plabel = "Power [counts]"
 
-fil = frequency_cut("Voyager1.single_coarse.fine_res.fil", 8419, 8421, [8419.5, 8419.8, None, None], [None, None, 6, 9])
+    # Reverse oder if vertical orientation.
+    if 'v' in orientation:
+        plt.plot(plot_data, plot_t, **kwargs)
+        plt.xlabel(plabel)
 
-fil.plot_all()
-plt.show()
+    else:
+        plt.plot(plot_t, plot_data, **kwargs)
+        plt.xlabel(tlabel)
+        plt.ylabel(plabel)
+
+    ax.autoscale(axis='both',tight=True)
+    end = time.time()
+    print("Time for np.nanmean: %.2f" % (end - start))
+
+def plot_time_series_mean(filename, f_start=None, f_stop=None, if_id=0, logged=True, orientation='h', MJD_time=False, **kwargs):
+    """ Plot the time series.
+
+     Args:
+        filename (string): name of file to run test on
+        f_start (float): start frequency, in MHz
+        f_stop (float): stop frequency, in MHz
+        logged (bool): Plot in linear (False) or dB units (True),
+        kwargs: keyword args to be passed to matplotlib imshow()
+    """
+
+    start = time.time()
+    fil = bp.Waterfall(filename, f_start=f_start, f_stop=f_stop)
+
+    ax = plt.gca()
+    plot_f, plot_data = fil.grab_data(f_start, f_stop, if_id)
+
+    if logged and fil.header[b'nbits'] >= 8:
+        plot_data = db(plot_data)
+
+    #Since the data has been squeezed, the axis for time goes away if only one bin, causing a bug with axis=1
+    if len(plot_data.shape) > 1:
+        plot_data = np.mean(plot_data, axis=1)
+    else:
+        plot_data = np.mean(plot_data)
+
+    #Make proper time axis for plotting (but only for plotting!). Note that this makes the values inclusive.
+    extent = fil._calc_extent(plot_f=plot_f,plot_t=fil.timestamps,MJD_time=MJD_time)
+    plot_t = np.linspace(extent[2],extent[3],len(fil.timestamps))
+
+    if MJD_time:
+        tlabel = "Time [MJD]"
+    else:
+        tlabel = "Time [s]"
+
+    if logged:
+        plabel = "Power [dB]"
+    else:
+        plabel = "Power [counts]"
+
+    # Reverse oder if vertical orientation.
+    if 'v' in orientation:
+        plt.plot(plot_data, plot_t, **kwargs)
+        plt.xlabel(plabel)
+
+    else:
+        plt.plot(plot_t, plot_data, **kwargs)
+        plt.xlabel(tlabel)
+        plt.ylabel(plabel)
+
+    ax.autoscale(axis='both',tight=True)
+    end = time.time()
+    print("Time for np.mean: %.2f" % (end - start))
+
+
+plot_time_series_nanmean("Voyager1.single_coarse.fine_res.fil")
+plot_time_series_mean("Voyager1.single_coarse.fine_res.fil")
