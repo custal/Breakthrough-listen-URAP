@@ -1,7 +1,13 @@
 """
 #nanmean_vs_mean_time.py
 
-Test for difference in computation time, if any, between numpy.mean() and numpy.nanmean() in the plot_time_series() function from filterbank module
+Test for difference in computation time, if any, between numpy.mean() and numpy.nanmean() in the plot_time_series() function 
+from filterbank module
+
+Tested 'spliced_blc0001020304050607_guppi_57936_37003_HIP116719_0057.gpuspec.0002.h5' of file size 258 Mb on ccorlett@blpc0. 
+Results (seconds):
+Time for np.nanmean: 73.72
+Time for np.mean: 27.92
 
 """
 
