@@ -62,11 +62,11 @@ def frequency_cut(filename, f_start=None, f_stop=None, *ft_cut):
 
             for i in range(ft_interval[2], ft_interval[3]):
                 for j in range(ft_interval[0], ft_interval[1]):
-                    fil.data[i, 0, j] = 'nan'
+                    fil.data[i, 0, j] = np.nan
 
     return fil
 
 fil = frequency_cut("Voyager1.single_coarse.fine_res.fil", 8419, 8421, [8419.5, 8419.8, None, None], [None, None, 6, 9])
 
-fil.plot_all()
+fil.plot_spectrum()
 plt.show()
