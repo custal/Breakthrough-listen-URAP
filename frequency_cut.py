@@ -15,6 +15,7 @@ import blimpy as bp
 import pylab as plt
 import numpy as np
 
+
 def frequency_to_index(frequency, f_increment, f0):
     return int(np.round((frequency - f0) / f_increment))
 
@@ -32,6 +33,9 @@ def frequency_cut(filename, f_start=None, f_stop=None, *ft_cut):
     """
 
     fil = bp.Waterfall(filename, f_start=f_start, f_stop=f_stop)
+
+    #Set whichnan to true so plot functions know whether to use nan functions or not
+    fil.whichnan = True
 
     #Cut requested frequency and time ranges
     if ft_cut:
@@ -66,7 +70,8 @@ def frequency_cut(filename, f_start=None, f_stop=None, *ft_cut):
 
     return fil
 
-fil = frequency_cut("Voyager1.single_coarse.fine_res.fil", 8419, 8421, [8419.5, 8419.8, None, None], [None, None, 6, 9])
+#fil = frequency_cut("Voyager1.single_coarse.fine_res.fil")#, 8419, 8421, [8419.5, 8419.8, None, None], [None, None, 6, 9])
 
-fil.plot_spectrum()
+fil = bp.Waterfall("blc00_guppi_57872_20242_DIAG_2MASS_1502+2250_0024.gpuspec.0002.fil", f_start=9200, f_stop=9300)
+fil.plot_all()
 plt.show()
