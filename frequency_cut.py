@@ -72,6 +72,7 @@ def frequency_cut(filename, f_start=None, f_stop=None, *ft_cut):
 
 #fil = frequency_cut("Voyager1.single_coarse.fine_res.fil")#, 8419, 8421, [8419.5, 8419.8, None, None], [None, None, 6, 9])
 
-fil = bp.Waterfall("blc00_guppi_57872_20242_DIAG_2MASS_1502+2250_0024.gpuspec.0002.fil", f_start=9200, f_stop=9300)
-fil.plot_all()
+fil = bp.Waterfall("blc00_guppi_57872_20242_DIAG_2MASS_1502+2250_0024.gpuspec.0002.fil")
+
+fil.plot_spectrum(logged=True, t='all')
 plt.show()
