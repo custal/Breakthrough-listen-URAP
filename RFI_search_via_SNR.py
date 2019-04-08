@@ -1,8 +1,21 @@
+"""
+#RFI_search_via_SNR.py
+
+Find RFI by excluding any points with a large signal to noise ratio.
+
+TODO: Once a point has been removed mark its frequency value.
+
+"""
+
 import numpy as np
 import blimpy as bp
 import pylab as plt
 from blimpy.utils import db, lin, rebin, closest, unpack_2to8
 from blimpy.sigproc import *
+
+
+
+#np.set_printoptions(threshold=np.inf)
 
 def get_spikes(arr, period):
     """Finds the indices of the DC spikes of a GBT spectrum based on a priori
@@ -22,11 +35,35 @@ def get_spikes(arr, period):
     spikes (np.array): List of indices at which the spikes occur.
     """
 
-    last_index = len(arr)-1
+    last_index = len(arr)+1
     #Spikes are assumed to start half a period from beginning
     #of data and repeat with the given periodicity.
     spikes = np.arange(0, last_index, period)
     return spikes.astype(int)
+
+def grab_data_index(array, start_index, end_index, direction):
+    """Grabs data between specified indexes.
+
+    Args:
+    -----
+    array (array of floats): Array to grab data from.
+    start_index (int): Grab data starting from this index.
+    end_index (int): Grab data ending at this index.
+    direction (float): direction of data (file.header[b'foff'])
+
+    Returns:
+    --------
+    Data between specified indexes
+    """
+
+    data = []
+    for i in range(start_index, end_index+1):
+        data.append(array[i])
+
+    if direction < 0:
+        data[::-1]
+
+    return data
 
 
 def remove_RFI(file, t=0):
@@ -36,76 +73,223 @@ def remove_RFI(file, t=0):
     Args:
     -----
     file (waterfall): Waterfall object to have data removed from.
-    t (int): integration of data to take
+    t (int): time integration of data to take
 
     Returns:
     --------
     waterfall object with RFI removed
+
+    TODO: make std threshold and number of coarse channels variables (and %
+    data cut above and below)
+    TODO: number of coarse channels, 64, is hard coded in, any way to discern
+    this from file header?
     """
 
     #find spike points defining coarse channels
     chans_per_coarse = int(file.file_header[b'nchans'])/64
-    spikes = get_spikes(file.data[0][0], chans_per_coarse)
+    spikes = get_spikes(file.data[t][0], chans_per_coarse)
 
-    freqs = file.populate_freqs()
-    if file.header[b'foff'] < 0:
-        freqs = freqs[::-1]
+    n_coarse_chan = file.calc_n_coarse_chan()
+    file.blank_dc(n_coarse_chan)
 
     coarse_channels = []
     #Make array of coarse channels (sorts only first integration at the moment)
     for i in range(len(spikes)-1):
-         package = []
-         coarse_chan_f, coarse_chan_data = file.grab_data(freqs[spikes[i]], freqs[spikes[i+1]])
-         package.append(coarse_chan_f)
-         package.append(db(coarse_chan_data[t]))
-         coarse_channels.append(package)
+         coarse_chan_data = grab_data_index(file.data[t][0], spikes[i], spikes[i+1]-1, file.header[b'foff'])
+         coarse_channels.append(db(coarse_chan_data))
+
+    coarse_channels_masked = []
+    for coarse in coarse_channels:
+        coarse_chan_data_sorted = np.sort(coarse)
+
+        #remove top 10% and bottom 20% of array, this cuts RFI and FFT spikes
+        coarse_chan_data_sorted = np.delete(coarse_chan_data_sorted, np.s_[int(chans_per_coarse*0.9):int(chans_per_coarse+1)])
+        coarse_chan_data_sorted = np.delete(coarse_chan_data_sorted, np.s_[0:int(chans_per_coarse*0.2)])
+
+        std = np.std(coarse_chan_data_sorted)
+        median = np.median(coarse_chan_data_sorted)
+
+        #mask values that maybe RFI above a specified standard deviation
+        coarse_masked = np.ma.array(coarse)
+        coarse_masked = np.ma.masked_where((coarse - median)/std > 10 , coarse)
+        coarse_channels_masked.append(coarse_masked)
 
 
-    channel = 60
-    #Remove RFI (29)
-    #for coarse in coarse_channels:
-    coarse = coarse_channels[channel]
-    coarse_chan_data = coarse[1]
-    coarse_chan_data_sorted = np.sort(coarse_chan_data)
+    all_channels = np.ma.concatenate(coarse_channels_masked)
+    file.data[t][0] = all_channels
 
-    #remove top 10% and bottom 20% of array, this cuts RFI and FFT spikes
-    coarse_chan_data_sorted = np.delete(coarse_chan_data_sorted, np.s_[int(chans_per_coarse*0.9):int(chans_per_coarse+1)])
-    coarse_chan_data_sorted = np.delete(coarse_chan_data_sorted, np.s_[0:int(chans_per_coarse*0.2)])
+    freqs = file.populate_freqs()
+    if file.header[b'foff'] < 0:
+        freqs[::-1]
 
-    std = np.std(coarse_chan_data_sorted)
-    print(std)
-    #mask values that maybe RFI above a specified standard deviation
-    median = np.median(coarse_chan_data)
-    print(median)
-    coarse = np.ma.array(coarse_chan_data)
-    coarse = np.ma.masked_where((coarse_chan_data - median)/std > 5 , coarse_chan_data)
+    plt.plot(freqs, all_channels)
+    return
+    # test_channels = []
+    # for i in range(24,25):
+    #     test_channels.append(coarse_channels_masked[i])
+    #
+    # test_channels = np.ma.concatenate(test_channels)
+    # x = range(1024)
+    # plt.plot(x, test_channels)
+    #
+    # plt.subplot(2, 1, 1)
+    # plt.plot(freqs, db(file.data[t][0]))
+    # plt.title('RFI search via SNR')
+    #
+    # plt.subplot(2, 1, 2)
+    # plt.plot(freqs, all_channels)
 
-    median_array = [median] * len(coarse_channels[channel][0])
-    plt.plot(coarse_channels[channel][0], median_array)
-    plt.plot(coarse_channels[channel][0], coarse)
+def mark_RFI(file, t=0):
+    """Similar to above function but marks index of RFI instead of removing it.
+    Additional feature: finds the RFI from the median spectrum.
+
+    Args:
+    -----
+    file (waterfall): Waterfall object to have data removed from.
+    t (int): time integration of data to take
+
+    Returns:
+    --------
+    array of indexes which are marked as being at RFI frequencies.
+
+    TODO: make std threshold and number of coarse channels variables (and %
+    data cut above and below)
+    TODO: number of coarse channels, 64, is hard coded in, any way to discern
+    this from file header?
+    """
+
+    #find spike points defining coarse channels
+    chans_per_coarse = int(file.file_header[b'nchans'])/64
+    spikes = get_spikes(file.data[t][0], chans_per_coarse)
+
+    n_coarse_chan = file.calc_n_coarse_chan()
+    file.blank_dc(n_coarse_chan)
+    data = np.median(file.data, axis=0)[0]
+    #data = file.data[0][0]
+
+    coarse_channels = []
+    #Make array of coarse channels (sorts only first integration at the moment)
+    for i in range(len(spikes)-1):
+         coarse_chan_data = grab_data_index(data, spikes[i], spikes[i+1]-1, file.header[b'foff'])
+         coarse_channels.append(db(coarse_chan_data))
+
+    marked_indexes = []
+    for i, coarse in enumerate(coarse_channels):
+        coarse_chan_data_sorted = np.sort(coarse)
+
+        #remove top 10% and bottom 20% of array, this cuts RFI and FFT spikes
+        coarse_chan_data_sorted = np.delete(coarse_chan_data_sorted, np.s_[int(chans_per_coarse*0.9):int(chans_per_coarse+1)])
+        coarse_chan_data_sorted = np.delete(coarse_chan_data_sorted, np.s_[0:int(chans_per_coarse*0.2)])
+
+        std = np.std(coarse_chan_data_sorted)
+        median = np.median(coarse_chan_data_sorted)
+
+        #return indexes that maybe RFI above a specified standard deviation
+        coarse_normalized = (coarse - median)/std
+        coarse_marked = np.argwhere(coarse_normalized > 10)
+
+        #create list of marked indexes
+        if len(coarse_marked) != 0:
+            coarse_marked = coarse_marked.flatten()
+            coarse_marked = coarse_marked + spikes[i]
+            marked_indexes.append(coarse_marked)
+
+    marked_indexes = np.concatenate(marked_indexes)
+    return marked_indexes
 
 
-#used to test to view spikes
-# x = []
-# y = []
-# a = 60
-# for i in range(2048):
-#     print(plot_f[int(spikes[a]+i)], plot_data[int(spikes[a]+i)])
-#     if i != 0:
-#         x.append(plot_f[int(spikes[a]+i)])
-#         y.append(plot_data[int(spikes[a]+i)])
-#     else:
-#         print("^")
-#         x.append(plot_f[int(spikes[a]+i)])
-#         y.append(plot_data[int(spikes[a]+i)])
-#         x0 = plot_f[int(spikes[a]+i)]
-#         y0 = plot_data[int(spikes[a]+i)]
-#
-#
-# plt.plot(x, y)
-# plt.scatter(x0, y0, s=50)
+def mark_RFI_aggregated(file, aggregate=1, t=0):
+    """Similar to above function but marks index of RFI instead of removing it.
+    Additional feature: finds the RFI from the median spectrum but aggregated
+    into blocks.
+
+    Args:
+    -----
+    file (waterfall): Waterfall object to have data removed from.
+    aggregate (int): Number to divide data in the time axis. Larger number makes
+    RFI search more refined and more likely to find transient RFI.
+    t (int): time integration of data to take.
+
+    Returns:
+    --------
+    array of indexes which are marked as being at RFI frequencies.
+
+    TODO: make std threshold and number of coarse channels variables (and %
+    data cut above and below)
+    TODO: number of coarse channels, 64, is hard coded in, any way to discern
+    this from file header?
+    """
+
+    #find spike points defining coarse channels
+    chans_per_coarse = int(file.file_header[b'nchans'])/64
+    spikes = get_spikes(file.data[t][0], chans_per_coarse)
+
+    n_coarse_chan = file.calc_n_coarse_chan()
+    file.blank_dc(n_coarse_chan)
+
+    #aggregate data to hopefully detect more RFI
+    data_split = np.array_split(file.data, aggregate, axis=0)
+
+    marked_indexes = []
+    for data in data_split:
+        data = np.median(data, axis=0)[0]
+
+        coarse_channels = []
+        #Make array of coarse channels (sorts only first integration at the moment)
+        for i in range(len(spikes)-1):
+             coarse_chan_data = grab_data_index(data, spikes[i], spikes[i+1]-1, file.header[b'foff'])
+             coarse_channels.append(db(coarse_chan_data))
+
+        for i, coarse in enumerate(coarse_channels):
+            coarse_chan_data_sorted = np.sort(coarse)
+
+            #remove top 10% and bottom 20% of array, this cuts RFI and FFT spikes
+            coarse_chan_data_sorted = np.delete(coarse_chan_data_sorted, np.s_[int(chans_per_coarse*0.9):int(chans_per_coarse+1)])
+            coarse_chan_data_sorted = np.delete(coarse_chan_data_sorted, np.s_[0:int(chans_per_coarse*0.2)])
+
+            std = np.std(coarse_chan_data_sorted)
+            median = np.median(coarse_chan_data_sorted)
+
+            #return indexes that maybe RFI above a specified standard deviation
+            coarse_normalized = (coarse - median)/std
+            coarse_marked = np.argwhere(coarse_normalized > 10)
+
+            #create list of marked indexes
+            if len(coarse_marked) != 0:
+                coarse_marked = coarse_marked.flatten()
+                coarse_marked = coarse_marked + spikes[i]
+                marked_indexes.append(coarse_marked)
+
+    marked_indexes = np.concatenate(marked_indexes)
+    marked_indexes = np.unique(marked_indexes)
+    return marked_indexes
+
+
+def frequency_cut(file, f_index):
+    """ Cut entire frequency column for a given index.
+
+    Args:
+        file (waterfall): waterfall object to cut data from.
+        f_index (arrray of ints): Array of frequency indexes to be cut.
+
+
+    Returns:
+        (file): instance of Waterfall with cut data
+    """
+
+    #make mask
+    mask = np.zeros(file.data.shape, dtype=bool)
+    for index in f_index:
+        for i in range(len(file.data)):
+            mask[i][0][index] = True
+
+    file.data = np.ma.array(file.data, mask=mask)
+    return file
 
 
 fil = bp.Waterfall("blc00_guppi_57872_20242_DIAG_2MASS_1502+2250_0024.gpuspec.0002.fil")
-remove_RFI(fil)
+marked_indexes = mark_RFI_aggregated(fil, 100)
+fil = frequency_cut(fil, marked_indexes)
+fil.plot_waterfall()
+
 plt.show()
