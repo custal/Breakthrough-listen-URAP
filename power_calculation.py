@@ -30,6 +30,18 @@ def power_integration(*fil_array):
         power = np.sum(fil.data)
         print(power)
 
-fil1 = bp.Waterfall("blc00_guppi_57872_20242_DIAG_2MASS_1502+2250_0024.gpuspec.0002.fil")
-fil2 = bp.Waterfall("blc05_guppi_57872_20242_DIAG_2MASS_1502+2250_0024.gpuspec.0002.fil")
-power_integration(fil1, fil2)
+spliced_blc0001020304050607_guppi_57660_64028_HIP57601_0040.gpuspec.0002.h5
+spliced_blc0001020304050607_guppi_57660_64379_HIP58684_0041.gpuspec.0002.h5
+spliced_blc0001020304050607_guppi_57660_64723_HIP57780_0042.gpuspec.0002.h5
+spliced_blc0001020304050607_guppi_57660_65067_HIP58684_0043.gpuspec.0002.h5
+spliced_blc0001020304050607_guppi_57660_65408_HIP57845_0044.gpuspec.0002.h5
+
+fil0 = bp.Waterfall("spliced_blc0001020304050607_guppi_57660_63677_HIP58684_0039.gpuspec.0002.h5")
+fil1 = bp.Waterfall("spliced_blc0001020304050607_guppi_57660_64028_HIP57601_0040.gpuspec.0002.h5")
+fil2 = bp.Waterfall("spliced_blc0001020304050607_guppi_57660_64379_HIP58684_0041.gpuspec.0002.h5")
+fil3 = bp.Waterfall("spliced_blc0001020304050607_guppi_57660_64723_HIP57780_0042.gpuspec.0002.h5")
+fil4 = bp.Waterfall("spliced_blc0001020304050607_guppi_57660_65067_HIP58684_0043.gpuspec.0002.h5")
+fil5 = bp.Waterfall("spliced_blc0001020304050607_guppi_57660_65408_HIP57845_0044.gpuspec.0002.h5")
+
+
+power_integration(fil0, fil1, fil2, fil3, fil4, fil5, fil6)
