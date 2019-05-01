@@ -1,0 +1,9 @@
+[console_scripts]
+bldice = blimpy.dice:cmd_tool
+fil2h5 = blimpy.fil2h5:cmd_tool
+filutil = blimpy.filterbank:cmd_tool
+h52fil = blimpy.h52fil:cmd_tool
+matchfils = blimpy.match_fils:cmd_tool
+rawutil = blimpy.guppi:cmd_tool
+watutil = blimpy.waterfall:cmd_tool
+
