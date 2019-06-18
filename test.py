@@ -31,6 +31,8 @@ from blimpy.utils import db, lin, rebin, closest, unpack_2to8
 
 # plt.show()
 
-a = [0,5,10,15,20,25,30,35,40,45,50,55,60]
-b = bisect.bisect_right(a, 14.9)
-print(b)
+a = []
+b = [1,2,3]
+
+if not (2 in b):
+    print(b)

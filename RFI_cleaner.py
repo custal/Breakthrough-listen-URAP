@@ -3,31 +3,24 @@
 
 Find RFI by excluding any points with a large signal to noise ratio.
 
-TODO: Once a point has been removed mark its frequency value.
 
 """
 
 import numpy as np
 import blimpy as bp
-import pylab as plt
 import bisect
 from blimpy.utils import db, lin, rebin, closest, unpack_2to8
 from blimpy.sigproc import *
-#from spec_fit import _smart_split
 
-
-
-#np.set_printoptions(threshold=np.inf)
 
 class Marked_index(object):
     """Class for holding data on indices to later be cut and the mask to replace
-    them with. Zeroe by default, set to median value of coarse channel by
+    them with. Zero by default, set to median value of coarse channel by
     mark_RFI or assigned when calling add_indices or add_freq_range  """
 
     def __init__(self, index, mask=0):
         self.index = index
         self.mask = mask
-
 
 
 def get_spikes(data_length, chans_per_coarse_chan_num):
@@ -39,7 +32,7 @@ def get_spikes(data_length, chans_per_coarse_chan_num):
 
     Args:
     -----
-    data_length (int): Length of data
+    data_length (int): Length of data in frequency axis.
     chans_per_coarse_chan_num (int): number of channels per coarse channel
     selection size. eg. for a 0002 file with 5 coarse chans selected
     chans_per_coarse_chan_num = 1024*5.
@@ -54,6 +47,7 @@ def get_spikes(data_length, chans_per_coarse_chan_num):
     spikes = np.arange(0, last_index, chans_per_coarse_chan_num)
 
     return spikes.astype(int)
+
 
 def grab_data_index(array, start_index, end_index, direction):
     """Grabs data between specified indexes.
@@ -80,81 +74,7 @@ def grab_data_index(array, start_index, end_index, direction):
     return data
 
 
-# def remove_RFI(file, t=0):
-#     """Removes potential RFI signals from data by removing data points with a
-#     high standard deviation above the mean signal to noise ratio.
-#
-#     Args:
-#     -----
-#     file (waterfall): Waterfall object to have data removed from.
-#     t (int): time integration of data to take
-#
-#     Returns:
-#     --------
-#     waterfall object with RFI removed
-#
-#     TODO: make std threshold and number of coarse channels variables (and %
-#     data cut above and below)
-#     TODO: number of coarse channels, 64, is hard coded in, any way to discern
-#     this from file header?
-#     """
-#
-#     #find spike points defining coarse channels
-#     chans_per_coarse = int(file.file_header[b'nchans'])/64
-#     spikes = get_spikes(file.data[t][0], chans_per_coarse)
-#
-#     n_coarse_chan = file.calc_n_coarse_chan()
-#     file.blank_dc(n_coarse_chan)
-#
-#     coarse_channels = []
-#     #Make array of coarse channels (sorts only first integration at the moment)
-#     for i in range(len(spikes)-1):
-#          coarse_chan_data = grab_data_index(file.data[t][0], spikes[i], spikes[i+1]-1, file.header[b'foff'])
-#          coarse_channels.append(db(coarse_chan_data))
-#
-#     coarse_channels_masked = []
-#     for coarse in coarse_channels:
-#         coarse_chan_data_sorted = np.sort(coarse)
-#
-#         #remove top 10% and bottom 20% of array, this cuts RFI and FFT spikes
-#         coarse_chan_data_sorted = np.delete(coarse_chan_data_sorted, np.s_[int(chans_per_coarse*0.9):int(chans_per_coarse+1)])
-#         coarse_chan_data_sorted = np.delete(coarse_chan_data_sorted, np.s_[0:int(chans_per_coarse*0.2)])
-#
-#         std = np.std(coarse_chan_data_sorted)
-#         median = np.median(coarse_chan_data_sorted)
-#
-#         #mask values that maybe RFI above a specified standard deviation
-#         coarse_masked = np.ma.array(coarse)
-#         coarse_masked = np.ma.masked_where((coarse - median)/std > 5 , coarse)
-#         coarse_channels_masked.append(coarse_masked)
-#
-#
-#     all_channels = np.ma.concatenate(coarse_channels_masked)
-#     file.data[t][0] = all_channels
-#
-#     freqs = file.populate_freqs()
-#     if file.header[b'foff'] < 0:
-#         freqs[::-1]
-#
-#     plt.plot(freqs, all_channels)
-#     return
-#     # test_channels = []
-#     # for i in range(24,25):
-#     #     test_channels.append(coarse_channels_masked[i])
-#     #
-#     # test_channels = np.ma.concatenate(test_channels)
-#     # x = range(1024)
-#     # plt.plot(x, test_channels)
-#     #
-#     # plt.subplot(2, 1, 1)
-#     # plt.plot(freqs, db(file.data[t][0]))
-#     # plt.title('RFI search via SNR')
-#     #
-#     # plt.subplot(2, 1, 2)
-#     # plt.plot(freqs, all_channels)
-
-
-def mark_RFI(file, aggregate=1, central_lower=0.2, central_upper=0.8, sigma=10, coarse_chan_num=1, t=0):
+def mark_RFI(file, aggregate=1, central_lower=0.2, central_upper=0.8, sigma=10, coarse_chan_num=15):
     """Marks potential RFI signals from data by removing data points with a high
     standard deviation above the mean signal to noise ratio.
 
@@ -174,14 +94,12 @@ def mark_RFI(file, aggregate=1, central_lower=0.2, central_upper=0.8, sigma=10, 
     removes top 30% of data before median calculation.
     sigma (float): Remove any data points with a value greater than sigma standard
     deviations away from the central median
-    t (int): time integration of data to take.
 
     Returns:
     --------
     array of indexes which are marked as being at RFI frequencies.
 
-    TODO: Find way to remove non unique indices.
-    Check if it would be better to run clean DC bins outside of this function as
+    TODO: Check if it would be better to run clean DC bins outside of this function as
     other functions may be called before hand that might also clean the file of
     DC bins
     """
@@ -192,6 +110,11 @@ def mark_RFI(file, aggregate=1, central_lower=0.2, central_upper=0.8, sigma=10, 
     if aggregate > time_indices:
         print("Aggregate greater than number of time indices in file, %i, please choose a smaller or equal number." % (time_indices))
         return a
+
+    if isinstance(aggregate, int) == False:
+        print("aggregate is not an interger")
+        return a
+
     #make sure central_lower < central_upper
     if central_lower > central_upper:
         print("Lower_central is greater than upper_central")
@@ -202,18 +125,24 @@ def mark_RFI(file, aggregate=1, central_lower=0.2, central_upper=0.8, sigma=10, 
         print("coarse_chan_num greater than number of coarse channels")
         return a
 
+    if isinstance(coarse_chan_num, int) == False:
+        print("coarse_chan_num is not an interger")
+        return a
+
     fine_chans_per_coarse_chan = int(file.header[b'nchans']/n_coarse_chan)
     chans_per_coarse_chan_num = fine_chans_per_coarse_chan*coarse_chan_num
     data_length = len(file.data[0][0])
 
     #find spike points defining coarse channels, can grab more than one. For 0002 files this is 1024
     spikes = get_spikes(data_length, chans_per_coarse_chan_num)
-    file.blank_dc(n_coarse_chan)
 
     #aggregate along time axis data to hopefully detect more RFI
     data_split = np.array_split(file.data, aggregate, axis=0)
 
+    #Array of indices to be removed. The elements of this array are memebers of the Marked_index class.
     marked_indices = []
+    #Array to hold marked indices as ints to cross check against to avoid duplicate markings
+    marked_indices_check = []
     for data in data_split:
         data = np.median(data, axis=0)[0]
 
@@ -248,9 +177,11 @@ def mark_RFI(file, aggregate=1, central_lower=0.2, central_upper=0.8, sigma=10, 
                 coarse_marked = coarse_marked.flatten()
                 coarse_marked = coarse_marked + spikes[i]
 
-            #store marked indices as Marked_index class which also stores mask value
+            #store marked indices as Marked_index class which also stores mask value, also check for repeated indices
             for j in range(len(coarse_marked)):
-                marked_indices.append(Marked_index(coarse_marked[j], lin(median)))
+                if not (coarse_marked[j] in marked_indices_check):
+                    marked_indices_check.append(coarse_marked[j])
+                    marked_indices.append(Marked_index(coarse_marked[j], lin(median)))
 
     return marked_indices
 
@@ -286,31 +217,35 @@ def frequency_cut(file, f_index, fill_mask=False):
 
     return file
 
-def add_indices(marked_indices, *frequencies):
-    """ Add more indices to be cut to the marked_indices array.
 
-    Args:
-        marked_indices (list of ints): Array of marked indices .
-        *frequencies (ints or list of ints): Frequency indices to be cut. Takes list or single values
+# def add_indices(marked_indices, *frequencies):
+#     """ Add more indices to be cut to the marked_indices array.
+#     TODO: Needs updating to include Marked_index class
+#
+#     Args:
+#         marked_indices (list of ints): Array of marked indices .
+#         *frequencies (ints or list of ints): Frequency indices to be cut. Takes list or single values
+# 
+#     Returns:
+#         (array of ints): Marked indices with new frequencies added
+#     """
+#
+#     for freq in frequencies:
+#         flat_list = []
+#         if type(freq) is list:
+#             for item in freq:
+#                  marked_indices.append(item)
+#         else:
+#             marked_indices.append(freq)
+#
+#     marked_indices = np.unique(marked_indices)
+#
+#     return marked_indices
 
-    Returns:
-        (array of ints): Marked indices with new frequencies added
-    """
-
-    for freq in frequencies:
-        flat_list = []
-        if type(freq) is list:
-            for item in freq:
-                 marked_indices.append(item)
-        else:
-            marked_indices.append(freq)
-
-    marked_indices = np.unique(marked_indices)
-
-    return marked_indices
 
 def frequency_to_index(frequency, f_increment, f0):
     return int(np.round((frequency - f0) / f_increment))
+
 
 def add_freq_range(fil, marked_indices, frequency_lower, frequency_upper, mask=True):
     """ Add an entire frequency range of indices to marked_indices.

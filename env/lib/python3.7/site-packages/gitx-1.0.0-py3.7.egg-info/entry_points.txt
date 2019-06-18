@@ -1,0 +1,4 @@
+
+    [console_scripts]
+    gitx = gitx.gitx:command_line_runner
+    

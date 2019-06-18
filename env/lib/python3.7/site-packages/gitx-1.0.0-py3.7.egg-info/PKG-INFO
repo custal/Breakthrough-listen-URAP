@@ -1,0 +1,67 @@
+Metadata-Version: 1.0
+Name: gitx
+Version: 1.0.0
+Summary: A simple tool that help you speed up git clone
+Home-page: UNKNOWN
+Author: LiuLiqiu
+Author-email: liuliqiu@yunba.io
+License: UNKNOWN
+Description: gitx
+        ===========
+        
+        A simple tool that help you speed up git clone.
+        
+        Install
+        ~~~~~~~
+        
+        Debian / Ubuntu:
+        
+        ::
+        
+            sudo pip install gitx
+        
+        CentOS / RedHat:
+        
+        ::
+        
+            sudo pip install gitx
+        	
+        MAC OS:
+        
+        ::
+        
+            sudo pip install gitx
+        
+        Usage
+        ~~~~~
+        
+        Init tool with proxy url,like:
+        
+        ::
+        
+            gitx proxy_set http://username:appkey@server:port
+        
+        Set git exec file path,like:
+        
+        ::
+        
+            gitx path_set /usr/bin/git
+        
+        Clone example respository:
+        
+        ::
+        
+            gitx clone https://github.com/jankari/example
+        
+        Check gitx version:
+        
+        ::
+        
+            gitx --version
+        
+        Test
+        ~~~~~
+        
+        Platform: Mac OS X 10.11,Ubuntu 16.04,CentOS 7
+        
+Platform: UNKNOWN
