@@ -33,6 +33,6 @@ from blimpy.utils import db, lin, rebin, closest, unpack_2to8
 
 a = []
 b = [1,2,3]
+c = reversed(b)[2]
 
-if not (2 in b):
-    print(b)
+print(c)

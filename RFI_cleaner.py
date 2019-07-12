@@ -225,7 +225,7 @@ def frequency_cut(file, f_index, fill_mask=False):
 #     Args:
 #         marked_indices (list of ints): Array of marked indices .
 #         *frequencies (ints or list of ints): Frequency indices to be cut. Takes list or single values
-# 
+#
 #     Returns:
 #         (array of ints): Marked indices with new frequencies added
 #     """
