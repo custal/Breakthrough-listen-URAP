@@ -4,14 +4,13 @@ import pylab as plt
 from RFI_cleaner import *
 
 
-#blc00_guppi_57872_20242_DIAG_2MASS_1502+2250_0024.gpuspec.0002.fil
-#spliced_blc0001020304050607_guppi_57936_37003_HIP116719_0057.gpuspec.0002.fil Presence of time spike due to RFI filling entire coarse channel
-fil = bp.Waterfall("blc20_guppi_57991_48821_3C161_0006.gpuspec.0002.fil")
-n_coarse_chan = fil.calc_n_coarse_chan()
-fil.blank_dc(n_coarse_chan)
-marked_indices = mark_RFI(fil, 56, 0.3, 0.7, 10, coarse_chan_num=1)
-#marked_indices = add_freq_range(fil, marked_indices, 6613, 6617)
-fil = frequency_cut(fil, marked_indices, fill_mask=True)
+
+fil = bp.Waterfall("/home/custal/Documents/Code/Waterfall_data/spliced_blc0001020304050607_guppi_57936_37003_HIP116719_0057.gpuspec.0002.fil") # Create a Waterfall object
+n_coarse_chan = fil.calc_n_coarse_chan() # Define the number of coarse channels. May be a bug where if a frequency range is defined when creating the Waterfall object this function does not work correctly, I have not investiagted this fully.
+fil.blank_dc(n_coarse_chan) # Call this to remove all DC bins which are artefacts from the FFT done on the data. They appear as spikes at the centre of each coarse channel.
+marked_indices = mark_RFI(fil, 100, 0.3, 0.7, 10, 15) # This function does the bulk of the computation. The input paramters have been found to work best for this file.
+marked_indices = add_freq_range(fil, marked_indices, 2307, 2364) # Thsi line demonstartes the ability to manually remove a specific range of frequencies. In this case we are removing the missing data which the mark_RFI does not detect.
+fil = frequency_cut(fil, marked_indices, fill_mask=True) # After defining all the indices we want to remove in the data we call this function to mask/erase them. The Waterfall object now works as normal but with the RFI removed
 
 
 plt.figure()
@@ -19,12 +18,3 @@ fil.plot_spectrum(logged=True)
 plt.figure()
 fil.plot_waterfall(logged=True)
 plt.show()
-
-# chan_sizes = [1024, 1792, 3584, 5488, 10976, 21952]
-# for i in chan_sizes:
-#     marked_indices = mark_RFI(fil, 100, 0.3, 0.7, 10, chans_per_coarse=i)
-#     fil = frequency_cut(fil, marked_indices, fill_mask=True)
-#     plt.figure()
-#     fil.plot_waterfall(logged=True)
-
-# plt.show()

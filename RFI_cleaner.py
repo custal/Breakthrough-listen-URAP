@@ -74,7 +74,7 @@ def grab_data_index(array, start_index, end_index, direction):
     return data
 
 
-def mark_RFI(file, aggregate=1, central_lower=0.2, central_upper=0.8, sigma=10, coarse_chan_num=15):
+def mark_RFI(file, aggregate=1, central_lower=0.2, central_upper=0.8, sigma=10, coarse_chan_num=1):
     """Marks potential RFI signals from data by removing data points with a high
     standard deviation above the mean signal to noise ratio.
 
