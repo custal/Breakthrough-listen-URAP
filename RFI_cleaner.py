@@ -302,7 +302,10 @@ class RFI_cleaner(object):
         Returns:
             (array of ints): Marked indices with new frequencies added
 
-        TODO: Make this work for the transient_mask option as well
+        TODO:
+        - Need to add mask to dictionary of masks.
+        - Need to be able to use this and mark_RFI in any order
+        - Include option for transient mask
         """
 
         f_increment = self.waterfall.file_header[b'foff']
