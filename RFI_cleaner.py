@@ -25,9 +25,12 @@ class RFI_cleaner(object):
         Args:
         -----
         indices (list[int]): list of indices which are marked as RFI
+        range_indices (list[int]): list of indices which are manually marked to be removed
+        range_masks (list(dict{range(int,int):int})): list of dictionaries where the keys are
+        the range of which to use the mask contained in the values. These correspond to the indices in range_masks.
         mask_dictionary (list(dict{range(int,int):int})): list of dictionaries where the keys are
         the range of which to use the mask contained in the values. Each dictionary corresponds to
-        a different time aggregate.
+        a different time aggregate if transient_mask is True.
         time_axis_split (list(range(int))): list of the ranges for which the data is split along the
         time axis when mark_RFI is called.
         transient_mask (bool): If True then blimpy will construct a seperate mask for each marked index
@@ -40,6 +43,8 @@ class RFI_cleaner(object):
 
         self.waterfall = waterfall_object
         self.indices = np.array([], dtype=int)
+        self.range_indices = []
+        self.range_masks = []
         self.masks = []
         self.time_axis_split = []
         self.transient_mask = transient_mask
@@ -236,6 +241,12 @@ class RFI_cleaner(object):
             for index in self.indices:
                 for i in range(len(self.waterfall.data)):
                     mask[i][0][index] = True
+            # also manually selected range.
+            if len(self.range_indices) != 0:
+                for indices in self.range_indices:
+                    for index in indices:
+                        for i in range(len(self.waterfall.data)):
+                            mask[i][0][index] = True
             self.waterfall.data = np.ma.array(self.waterfall.data, mask=mask)
         else:
             #Remove duplicate indices if not wanting transient mask
@@ -243,19 +254,27 @@ class RFI_cleaner(object):
                 self.indices.flatten()
                 self.indices = [np.unique(self.indices)]
             # Take advantage of the fact that the data is sorted
-            for i, range in enumerate(self.time_axis_split):
+            for i, time_range in enumerate(self.time_axis_split):
                 indices = self.indices[i]
                 for coarse_channel, mask in self.masks[i].items():
                     while len(indices) != 0:
                         index = indices[0]
                         if index in coarse_channel:
-                            for j in range:
+                            for j in time_range:
                                     self.waterfall.data[j][0][index] = mask
                             indices = np.delete(indices, 0)
                         else:
                             break
                     if len(indices) == 0:
                         break
+
+            # also manually selected range.
+            if len(self.range_indices) != 0:
+                for i, indices in enumerate(self.range_indices):
+                    for index in indices:
+                        for j in range(len(self.waterfall.data)):
+                            self.waterfall.data[j][0][index] = self.range_masks[i]
+
 
         return self.waterfall
 
@@ -303,9 +322,7 @@ class RFI_cleaner(object):
             (array of ints): Marked indices with new frequencies added
 
         TODO:
-        - Need to add mask to dictionary of masks.
-        - Need to be able to use this and mark_RFI in any order
-        - Include option for transient mask
+        - Include transient mask capabilities
         """
 
         f_increment = self.waterfall.file_header[b'foff']
@@ -318,7 +335,7 @@ class RFI_cleaner(object):
         #Find indices corresponding to frequency range.
         frequency_lower = self.frequency_to_index(frequency_lower, f_increment, f0)
         frequency_upper = self.frequency_to_index(frequency_upper, f_increment, f0)
-        frequency_range = np.arange(frequency_lower, frequency_upper)
+        frequency_range = range(frequency_lower, frequency_upper)
 
         #Create mask based on enclosing coarse channels
         if mask == True or mask == False:
@@ -343,6 +360,7 @@ class RFI_cleaner(object):
             mask = lin(mask)
 
         #Create cut
-        self.indices = np.append(self.indices, frequency_range)
+        self.range_indices.append(frequency_range)
+        self.range_masks.append(mask)
 
         #Add mask to mask dictionary
